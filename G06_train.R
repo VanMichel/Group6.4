@@ -11,13 +11,13 @@ netup <- function(d){
   W <- list()
   for(i in 1:(length(d)-1)){
     area <- d[i]* d[i+1]
-    W[[length(W) + 1]] <- matrix(runif(area,0,0.2), nrow = d[i+1],ncol = d[i])
+    W[[length(W) + 1]] <- matrix(runif(area,0,0.2), nrow = d[i+1],ncol = d[i])-0.1
   }
   
   #create b
   b <- list()
   for(i in 1:(length(d)-1)){
-    b[[length(b) + 1]] <- c(runif(d[i+1],0,0.2))
+    b[[length(b) + 1]] <- c(runif(d[i+1],0,0.2))-0.1
   }
   
   network_list <- list("h" = h, "W" = W, "b" = b)
@@ -79,9 +79,12 @@ backward <- function(nn,k){
   #backpropagate the loss
   for(i in rev(seq(1:length(nn$W)))){
     
-    dh[[i]] <- t(nn$W[[i]])%*%pmax(dh[[i+1]],0)
-    dW[[i]] <- pmax(dh[[i+1]],0)%*%t(nn$h[[i]])
-    db[[i]] <- pmax(dh[[i+1]],0)
+    #zero_ids <- which(nn$h[[i+1]]<=0)
+    
+    #dh[[i]] <- t(nn$W[[i]])%*%pmax(dh[[i+1]],0)
+    dh[[i]] <- t(nn$W[[i]])%*%(dh[[i+1]]*((nn$h[[i+1]]>0)+0L))
+    dW[[i]] <- (dh[[i+1]]*((nn$h[[i+1]]>0)+0L))%*%t(nn$h[[i]])
+    db[[i]] <- (dh[[i+1]]*((nn$h[[i+1]]>0)+0L))
   }
   
   #add derivatives to the results list
@@ -142,16 +145,16 @@ train <- function(nn,inp,k,eta=.01,mb=10,nstep=10000){
       
         #sum of gradients up to current i
         for(j in 1:length(copy_network$W)){
-        dLdW[[j]] <- dLdW[[j]] + copy_network_grads$dW[[j]]
-        dLdb[[j]] <- dLdb[[j]] + copy_network_grads$db[[j]]
+          dLdW[[j]] <- dLdW[[j]] + copy_network_grads$dW[[j]]
+          dLdb[[j]] <- dLdb[[j]] + copy_network_grads$db[[j]]
       }
     }
     }
     
     #update W and b in copy_network using the average of the mb gradients
     for(j in 1:length(copy_network$W)){
-    copy_network$W[[j]] <- copy_network$W[[j]] - eta*dLdW[[j]]/mb 
-    copy_network$b[[j]] <- copy_network$b[[j]] - eta*dLdb[[j]]/mb 
+      copy_network$W[[j]] <- copy_network$W[[j]] - eta*dLdW[[j]]/mb 
+      copy_network$b[[j]] <- copy_network$b[[j]] - eta*dLdb[[j]]/mb 
     }
     
     #reset gradients to zero for new gradient calculation
@@ -178,12 +181,108 @@ predicted <- rep(0,length(ii_test))
 
 train_values <- iris_values[-ii_test,]
 train_classes <- iris_classes[-ii_test]
-trained_network <- train(netup(c(4,8,7,3)),train_values,train_classes,mb=10)
 
+for(j in 1:100){
+  trained_network <- train(netup(c(4,8,7,3)),train_values,train_classes,mb=10)
+  
+  store_results <- list()
+  for (i in 1:length(ii_test)) {
+    result <- forward(trained_network,test_values[i,])$h[[4]]
+    store_results[[i]] <- result
+    predicted[i] <- which(result==max(result))
+  }
+  
+  predicted
+  test_classes
+  
+  cat(j, length(which((predicted-test_classes)==0))/30)
+  if(length(which((predicted-test_classes)==0))/30>0.9){
+    break
+  }
+}
+
+trained_network <- train(netup(c(4,8,7,3)),train_values,train_classes,mb=10,nstep=10000)
+
+trained_network <- train(netup(c(4,5,3)),train_values,train_classes,eta=.001,nstep=100000)
+
+
+untrained_network <- netup(c(4,5,3))
+
+store_results <- list()
 for (i in 1:length(ii_test)) {
-  result <- softmax(forward(trained_network,test_values[i,])$h[[4]])
+  result <- forward(trained_network,test_values[i,])$h[[4]]
+  store_results[[i]] <- result
+  predicted[i] <- which(result==max(result))
+}
+
+for (i in 1:length(train_values)) {
+  result <- forward(trained_network,train_values[i,])$h[[3]]
+  store_results[[i]] <- result
   predicted[i] <- which(result==max(result))
 }
 
 predicted
 test_classes
+
+if(length(which((predicted-test_classes)==0))/30>0.9){
+  break
+}
+
+
+
+
+
+train <- function(nn,inp,k,eta=.01,nstep=10000){
+  
+  #inp is a matrix whose rows are the datapoints
+  #k is the corresponding vector of classes 1,2,3,..
+  
+  copy_network <- nn
+  
+  #lists for the gradients used to update W and b
+  dLdW <- list()
+  dLdb <- list()
+  
+  #initialize to zero 
+  for(i in 1:length(copy_network$W)){
+    dLdW[[i]] <- 0
+    dLdb[[i]] <- 0
+  }
+  
+  
+  for (n in 1:nstep) {
+    
+    for (i in 1:nrow(inp)){
+      #compute node values
+      copy_network <- forward(copy_network,inp[i,])
+      #run backward to compute the gradients
+      copy_network_grads <- backward(copy_network, k[i])
+      
+      #sum of gradients up to current i
+      for(j in 1:length(copy_network$W)){
+        dLdW[[j]] <- dLdW[[j]] + copy_network_grads$dW[[j]]
+        dLdb[[j]] <- dLdb[[j]] + copy_network_grads$db[[j]]
+      }
+    }
+    
+    #update W and b in copy_network using the average of the mb gradients
+    for(j in 1:length(copy_network$W)){
+      copy_network$W[[j]] <- copy_network$W[[j]] - eta*dLdW[[j]]/120 
+      copy_network$b[[j]] <- copy_network$b[[j]] - eta*dLdb[[j]]/120 
+    }
+    
+    #reset gradients to zero for new gradient calculation
+    for(j in 1:length(copy_network$W)){
+      dLdW[[j]] <- 0
+      dLdb[[j]] <- 0
+    }
+    
+    
+
+  }
+  
+  #return the trained network
+  return(copy_network)
+}
+
+
