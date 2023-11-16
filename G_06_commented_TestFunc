@@ -1,0 +1,292 @@
+#                         EXTENDED STATISTICAL PROGRAMMING 
+#                     PRACTICAL 4: A STOCHASTIC GRADIENT DESCENT
+#                     A SIMPLE NEURAL NETWORK FOR CLASSIFICATION
+# -----------------------------------------------------------------------------                                
+# GROUP 6: 
+# -----------------------------------------------------------------------------
+# Michal Aleksandrowicz, s2614420@ed.ac.uk 
+# Alexandros Stamatiou, s2614411@ed.ac.uk
+# Yuli Wahyuningsih, s2465841@ed.ac.uk
+# https://github.com/VanMichel/Group6.4
+#-----------------------------------------------------------------------------
+# MEMBER CONTRIBUTIONS: 
+# -----------------------------------------------------------------------------
+# Michal Aleksandrowicz: 1/3 
+# Alexandros Stamatiou: 1/3
+# Yuli Wahyuningsih: 1/3
+# The group members feel that the workload was shared approximately fair. 
+# Michal did the initial code and built the nn structure. 
+# Alexandros expand and continued to build a trained network. 
+# Yuli tested the data to get final results and improved the functional of code
+# All code was cross-checked and commented by all members in collaboration. 
+
+# -----------------------------------------------------------------------------
+# OUTLINE:
+# -----------------------------------------------------------------------------
+# Stochastic Gradient Descent is an optimization approach that helps the aiming
+# of ‘deep learning’, so that we may have more parameters than data and flexible
+# on fitting any particular set of data. This code is creating a simple neural 
+# network (nn) for classification by using stochastic gradient descent.
+
+# In order to predict the factors of response variable, some predictor data 
+# (input data) can be used to classify it automatically.The main idea is to 
+# process the input data through the network which has parameters (Weight W 
+# and offsets b) controlling the combinations and transformations linking 
+# each layer to the next. 
+
+# Finally, the network need to be trained to get the best prediction of class k,
+# by adjusting the parameters to minimize some loss functions. The method is 
+# repeatedly find the gradient of the loss function w.r.t. the parameters for 
+# small randomly chosen subsets of the training data, and to adjust the 
+# parameters by taking a step in the direction of the negative gradient.
+# -----------------------------------------------------------------------------
+
+HIGH-LEVEL DESCRIPTION OF CODE:
+# -----------------------------------------------------------------------------
+# Step 1 - netup function
+#   input   : (d), a vector contains the length of nodes for each layer. The length 
+#             of d is equal to the total all layers
+#   process : build the nodes (h) structure and initiate value of W and b
+#   output  : (h, W, and b), return a list representing the neural network (nn)
+#          
+# Step 2 - forward function
+#   input   : (nn, inp), where nn is a network list as returned by netup and inp
+#             a vector of input values for the first layer
+#   process : update the nn (from netup function) according to the input data (inp)
+#   output  : return the updated network list 
+#          
+# Step 3 - backward function
+#   input   : (nn, k), where nn is returned from forward and k is the ouput class
+#   process : compute the derivatives of the loss corresponding to output class
+#             k for network nn.
+#   output  : (dh, dW, db), the derivatives w.r.t. the nodes, weights and offsets
+#             to added in the network list.
+#          
+# Step 4 - train function
+#   input   : (nn,inp,k,eta=.01,mb=10,nstep=10000)
+#             nn, given input data in the rows of matrix inp and corresponding 
+#             labels (1, 2, 3 . . . ) in vector k.
+#             eta is the step size η
+#             mb the number of data to randomly sample to compute the gradient. 
+#             nstep is the number of optimization steps to take.
+#   process : computing the gradient from small mb sample and
+#             updating the nn for n step time.
+#   output  : the trained nn
+#          
+# Step 5 - test_data function 
+#   input   : (d, data, class_col), where d refers to input's description on netup
+#             netup function. data is the file name of data and class_col 
+#             represents the columns of response variable in the data
+#   process : Set the data to train the nn and test data to get predicted class
+#   output  : (predicted, test_classes, misclassification.R)
+#             predicted is the prediction class from test set data
+#             test_classes is the actual class from test set data
+#             misclass.r is the proportion misclassified for the test set data
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~START OF CODE~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+####----------------------------Step 1--------------------------------------####
+#build the nodes (h) structure and initiate value of W and b
+netup <- function(d){
+  #create h list, append values
+  h <- list()
+  for(i in 1:length(d)){
+    new_vec <- rep(NA,d[i])
+    h[[length(h) + 1]] <- new_vec
+  }
+  
+  #create W
+  W <- list()
+  for(i in 1:(length(d)-1)){
+    area <- d[i]* d[i+1]
+    W[[length(W) + 1]] <- matrix(runif(area,0,0.2), nrow = d[i+1],ncol = d[i])-0.1
+  }
+  
+  #create b
+  b <- list()
+  for(i in 1:(length(d)-1)){
+    b[[length(b) + 1]] <- c(runif(d[i+1],0,0.2))-0.1
+  }
+  
+  network_list <- list("h" = h, "W" = W, "b" = b)
+  return(network_list)
+}
+
+
+#function to calculate a node for each possible class 
+softmax <- function(vec_out){
+  copy_vec <- exp(vec_out)/sum(exp(vec_out))
+  return(copy_vec)
+}
+
+####----------------------------Step 2--------------------------------------####
+#update the nn (from netup function) according to the input data (inp)
+forward <- function(nn,inp){
+  copy_network <- nn
+  
+  copy_network$h[[1]] <- inp
+  for(i in 1:(length(copy_network$h)-1)){
+    
+    #apply relu to hidden layers only
+    if(i!=(length(copy_network$h)-1)){
+      copy_network$h[[i+1]] <- pmax(copy_network$W[[i]]%*%copy_network$h[[i]]+copy_network$b[[i]],0)
+    }else{ #and softmax to the output layer
+      copy_network$h[[i+1]] <- softmax(copy_network$W[[i]]%*%copy_network$h[[i]]+copy_network$b[[i]])
+    }
+    
+  }
+  
+  return(copy_network)
+}
+
+
+####----------------------------Step 3--------------------------------------####
+backward <- function(nn,k){
+  
+  #label_pos <- which(k==1)
+  
+  #if k is an integer with the class number: 
+  loss_deriv <- tail(nn$h,1)[[1]]
+  loss_deriv[k] <- loss_deriv[k] - 1
+  
+  #calculate the loss for the current inp vector
+  #loss_deriv <- tail(nn$h,1)[[1]]-k
+  
+  dh <- list()
+  dh[[length(nn$W)+1]] <- loss_deriv
+  
+  dW <- list()
+  db <- list()
+  
+  #backpropagate the loss
+  for(i in rev(seq(1:length(nn$W)))){
+    
+    #zero_ids <- which(nn$h[[i+1]]<=0)
+    
+    #dh[[i]] <- t(nn$W[[i]])%*%pmax(dh[[i+1]],0)
+    dh[[i]] <- t(nn$W[[i]])%*%(dh[[i+1]]*((nn$h[[i+1]]>0)+0L))
+    dW[[i]] <- (dh[[i+1]]*((nn$h[[i+1]]>0)+0L))%*%t(nn$h[[i]])
+    db[[i]] <- (dh[[i+1]]*((nn$h[[i+1]]>0)+0L))
+  }
+  
+  #add derivatives to the results list
+  derivatives <- list("dh" = dh, "dW" = dW, "db" = db)
+  return(c(nn, derivatives))
+}
+
+
+####----------------------------Step 4--------------------------------------####
+#compute the derivatives of the loss corresponding to output class k for nn.
+train <- function(nn,inp,k,eta=.01,mb=10,nstep=10000){
+  
+  #inp is a matrix whose rows are the datapoints
+  #k is the corresponding vector of classes 1,2,3,..
+  
+  copy_network <- nn
+  
+  #lists for the gradients used to update W and b
+  dLdW <- list()
+  dLdb <- list()
+  
+  #initialize to zero 
+  for(i in 1:length(copy_network$W)){
+    dLdW[[i]] <- 0
+    dLdb[[i]] <- 0
+  }
+  
+  for (n in 1:nstep) {
+    #sample mb datapoint for gradient calculation
+    isample <- sample(1:nrow(inp), mb)
+    xdat <- inp[isample,]
+    kdat <- k[isample]
+    
+    if(mb == 1) {
+      #compute node values
+      copy_network <- forward(copy_network,xdat)
+      #run backward to compute the gradients
+      copy_network_grads <- backward(copy_network, kdat)
+      
+      for(i in 1:length(copy_network$W)){
+        dLdW[[i]] <- copy_network_grads$dW[[i]]
+        dLdb[[i]] <- copy_network_grads$db[[i]]
+      }
+      
+    }
+    
+    else{
+      
+      for (i in 1:mb){
+        #compute node values
+        copy_network <- forward(copy_network,xdat[i,])
+        #run backward to compute the gradients
+        copy_network_grads <- backward(copy_network, kdat[i])
+        
+        #sum of gradients up to current i
+        for(j in 1:length(copy_network$W)){
+          dLdW[[j]] <- dLdW[[j]] + copy_network_grads$dW[[j]]
+          dLdb[[j]] <- dLdb[[j]] + copy_network_grads$db[[j]]
+        }
+      }
+    }
+    #update W and b in copy_network using the average of the mb gradients
+    for(j in 1:length(copy_network$W)){
+      copy_network$W[[j]] <- copy_network$W[[j]] - eta*dLdW[[j]]/mb 
+      copy_network$b[[j]] <- copy_network$b[[j]] - eta*dLdb[[j]]/mb 
+    }
+    
+    #reset gradients to zero for new gradient calculation
+    for(j in 1:length(copy_network$W)){
+      dLdW[[j]] <- 0
+      dLdb[[j]] <- 0
+    }
+  }
+  #return the trained network
+  return(copy_network)
+}
+
+
+####----------------------------Step 5--------------------------------------####
+
+#Set the data to train the nn and test data to get predicted class
+test_data <- function(d = c(4,8,7,3), data = iris, class_col = ncol(data)) {
+  n_d = length(d) #count how many layers in the neural network's structure
+  class_col = 5 #input column for variable to predict
+  d_val = data[,-class_col] #
+  d_values = data.matrix(d_val)
+  d_classes = as.numeric(data[,class_col]) #labeling the classes to put in vector k
+  
+  #prepare a set test data consists of every 5th row, starting from row 5.
+  ii_test <- which((1:length(d_classes))%%5==0)
+  test_values <- d_values[ii_test,]
+  test_classes <- d_classes[ii_test]
+  predicted <- rep(0,length(ii_test))
+  
+  #prepare a set train data
+  train_values <- d_values[-ii_test,]
+  train_classes <- d_classes[-ii_test]
+
+  #training the fit network
+  set.seed(nrow(test_classes))
+  trained_network <- train(netup(d),train_values,train_classes,mb=10)
+ 
+  #classify the test data to species according to the class predicted             +
+  #+ as most probable by using the trained network
+  for (i in 1:length(ii_test)) {
+    result <- forward(trained_network,test_values[i,])$h[[n_d]]
+    predicted[i] <- which(result==max(result))
+  }
+  
+  #compute the misclassification rate
+  equal <- predicted == test_classes
+  misclass_rate = round(length(which(equal=="FALSE"))/length(predicted),2)
+  test_list = list("predicted" = predicted, "test_classes" = test_classes, "misclass.r" = misclass_rate)
+  return (test_list)
+  }
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+test.data = test_data() ; test.data
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~--END OF CODE~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
