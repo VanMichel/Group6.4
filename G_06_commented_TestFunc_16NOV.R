@@ -19,70 +19,44 @@
 # Alexandros expand and continued to build a trained network. 
 # Yuli tested the data to get final results and improved the functional of code
 # All code was cross-checked and commented by all members in collaboration. 
-
 # -----------------------------------------------------------------------------
 # OUTLINE:
 # -----------------------------------------------------------------------------
-# Stochastic Gradient Descent is an optimization approach that helps the aim
-# of ‘deep learning’, so that we may have more parameters than data and flexible
-# on fitting any particular set of data. This code is creating a simple neural 
-# network (nn) for classification by using stochastic gradient descent.
-
-# In order to predict the factors of response variable, some predictor data 
-# (input data) can be used to classify it automatically.The main idea is to 
-# process the input data through the network which has parameters (Weight W 
-# and offsets b) controlling the combinations and transformations linking 
-# each layer to the next. 
-
-# Finally, the network need to be trained to get the best prediction of class k,
-# by adjusting the parameters to minimize some loss functions. The method is 
-# repeatedly find the gradient of the loss function w.r.t. the parameters for 
-# small randomly chosen subsets of the training data, and to adjust the 
-# parameters by taking a step in the direction of the negative gradient.
+# R functions for creating and training a simple neural 
+# network (nn) for classification, using Stochastic Gradient Descent. This 
+# optimization approach minimizes a loss function, while retaining good 
+# generalizing power for application to other datasets. 
 # -----------------------------------------------------------------------------
-
-#HIGH-LEVEL DESCRIPTION OF CODE:
+# HIGH-LEVEL DESCRIPTION OF CODE:
 # -----------------------------------------------------------------------------
-# Step 1 - netup function
-#   input   : (d), a vector contains the length of nodes for each layer. The length 
-#             of d is equal to the total all layers
-#   process : build the nodes (h) structure and initiate value of W and b
-#   output  : (h, W, and b), return a list representing the neural network (nn)
-#          
-# Step 2 - forward function
-#   input   : (nn, inp), where nn is a network list as returned by netup and inp
-#             a vector of input values for the first layer
-#   process : update the nn (from netup function) according to the input data (inp)
-#   output  : return the updated network list 
-#          
-# Step 3 - backward function
-#   input   : (nn, k), where nn is returned from forward and k is the ouput class
-#   process : compute the derivatives of the loss corresponding to output class
-#             k for network nn.
-#   output  : (dh, dW, db), the derivatives w.r.t. the nodes, weights and offsets
-#             to added in the network list.
-#          
-# Step 4 - train function
-#   input   : (nn,inp,k,eta=.01,mb=10,nstep=10000)
-#             nn, given input data in the rows of matrix inp and corresponding 
-#             labels (1, 2, 3 . . . ) in vector k.
-#             eta is the step size η
-#             mb the number of data to randomly sample to compute the gradient. 
-#             nstep is the number of optimization steps to take.
-#   process : computing the gradient from small mb sample and
-#             updating the nn for n step time.
-#   output  : the trained nn
-#          
-# Step 5 - testing 
-#   In this step the iris dataset is divided into training and test sets, a
-#   neural network is trained, and tested, giving predicted labels for the
-#   test set, and misclasification rate.
+# The function netup() creates the node structure of the network according 
+# to a vector "d" containing the length of nodes for each layer. The value 
+# of weights "W" and biases "b" are initiated using random U(0,0.2) deviates. 
+# 
+# The function forward() accepts input (predictor) data and calculates 
+# the corresponding node values of the network nn created with the netup() 
+# function. Each layer is a linear combination of the previous one using the 
+# weights and biases, transformed with the non-linear ReLu function, which 
+# replaces negative node values by zeros. The node values in the last layer
+# last layer are the output data (response data) and they are transformed into
+# probabilities using the softmax() function. 
+# 
+# The dataset to be classified is assumed to be in the form (x_i, k_i) i=1,..n, 
+# where the x_i (vectors) contain the input values and the k_i the corresponding
+# classes. To get the network to predict the classes, the parameters W and b 
+# are adjusted to minimize the loss function:
+#           
+#                   L = - sum_{i=1}^n log (pk_i) / n
+#
+# Stochastic Gradient Descent repeatedly finds the gradient of L w.r.t. the 
+# parameters W and b for small randomly chosen subsets of the training data, 
+# and adjust the parameters by taking a step in the direction of the negative 
+# gradient. This algorithm is contained in the train() function, which uses 
+# the backward() function to calculate the gradient. 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~START OF CODE~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-####----------------------------Step 1--------------------------------------####
-#build the nodes (h) structure and initiate value of W and b
 netup <- function(d){
   ## Create a neural network structure with random weights and biases.
   ##
@@ -119,7 +93,6 @@ netup <- function(d){
   return(network_list)
 }
 
-#function to calculate output layer node values
 softmax <- function(vec_out){
   ## Apply softmax function to the output vector.
   ##
@@ -132,7 +105,6 @@ softmax <- function(vec_out){
   return(exp(vec_out)/sum(exp(vec_out)))
 }
 
-#function to calculate loss
 loss <- function(nn,inp,k){
   ## Calculate the loss for the neural network predictions.
   ##
@@ -160,8 +132,6 @@ loss <- function(nn,inp,k){
   return(sum/npoints)
 }
 
-####----------------------------Step 2--------------------------------------####
-#update the nn (from netup function) according to the input data (inp)
 forward <- function(nn,inp){
   ## Perform forward propagation through the neural network.
   ##
@@ -189,8 +159,6 @@ forward <- function(nn,inp){
   return(copy_network)
 }
 
-
-####----------------------------Step 3--------------------------------------####
 backward <- function(nn,k){
   ## Perform backward propagation through the neural network.
   ##
@@ -224,10 +192,6 @@ backward <- function(nn,k){
   return(c(nn, derivatives))
 }
 
-####----------------------------Step 4--------------------------------------####
-#compute the derivatives of the loss corresponding to output class k for nn.
-
-#function to train the network
 train <- function(nn,inp,k,eta=.01,mb=10,nstep=10000){
   ## Train the neural network using stochastic gradient descent.
   ##
@@ -294,7 +258,8 @@ train <- function(nn,inp,k,eta=.01,mb=10,nstep=10000){
   #return the trained network
   return(copy_network)
 }
-####----------------------------Step 5--------------------------------------####
+
+####----------------------------Train and test--------------------------------------####
 
 #set seed for good predictions
 set.seed(2)
