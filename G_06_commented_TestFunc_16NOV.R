@@ -73,15 +73,10 @@
 #             updating the nn for n step time.
 #   output  : the trained nn
 #          
-# Step 5 - test_data function 
-#   input   : (d, data, class_col), where d refers to input's description on netup
-#             netup function. data is the file name of data and class_col 
-#             represents the columns of response variable in the data
-#   process : Set the data to train the nn and test data to get predicted class
-#   output  : (predicted, test_classes, misclassification.R)
-#             predicted is the prediction class from test set data
-#             test_classes is the actual class from test set data
-#             misclass.r is the proportion misclassified for the test set data
+# Step 5 - testing 
+#   In this step the iris dataset is divided into training and test sets, a
+#   neural network is trained, and tested, giving predicted labels for the
+#   test set, and misclasification rate.
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~START OF CODE~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -89,6 +84,17 @@
 ####----------------------------Step 1--------------------------------------####
 #build the nodes (h) structure and initiate value of W and b
 netup <- function(d){
+  ## Create a neural network structure with random weights and biases.
+  ##
+  ## Parameters:
+  ## d: A vector representing the number of nodes in each layer of the network.
+  ##
+  ## Returns:
+  ## A list containing the neural network structure with the following elements:
+  ## - "h": A list of node values for each layer.
+  ## - "W": A list of weight matrices connecting the layers.
+  ## - "b": A list of bias vectors for each layer.
+  
   #create h list, append values - node values
   h <- list()
   for(i in 1:length(d)){
@@ -115,12 +121,29 @@ netup <- function(d){
 
 #function to calculate output layer node values
 softmax <- function(vec_out){
+  ## Apply softmax function to the output vector.
+  ##
+  ## Parameters:
+  ## vec_out: Vector representing the output values.
+  ##
+  ## Returns:
+  ## A vector of probabilities obtained by applying the softmax function.
+  
   return(exp(vec_out)/sum(exp(vec_out)))
 }
 
 #function to calculate loss
-loss <- function(nn,inp,k)
-{
+loss <- function(nn,inp,k){
+  ## Calculate the loss for the neural network predictions.
+  ##
+  ## Parameters:
+  ## nn: Neural network structure obtained from the netup function.
+  ## inp: Matrix with input data in its rows.
+  ## k: Vector of classes corresponding to each input row.
+  ##
+  ## Returns:
+  ## The average loss.
+  
   #inp is a matrix with input data in its rows; classes in vector k
   copy_network <- nn
   
@@ -137,11 +160,18 @@ loss <- function(nn,inp,k)
   return(sum/npoints)
 }
 
-
-
 ####----------------------------Step 2--------------------------------------####
 #update the nn (from netup function) according to the input data (inp)
 forward <- function(nn,inp){
+  ## Perform forward propagation through the neural network.
+  ##
+  ## Parameters:
+  ## nn: Neural network structure obtained from the netup function.
+  ## inp: Vector representing the input data.
+  ##
+  ## Returns:
+  ## Updated neural network structure after forward propagation.
+  
   copy_network <- nn
   
   copy_network$h[[1]] <- inp
@@ -162,6 +192,14 @@ forward <- function(nn,inp){
 
 ####----------------------------Step 3--------------------------------------####
 backward <- function(nn,k){
+  ## Perform backward propagation through the neural network.
+  ##
+  ## Parameters:
+  ## nn: Neural network structure obtained from the netup function.
+  ## k: Integer representing the true class of the input.
+  ##
+  ## Returns:
+  ## List containing the updated neural network structure and derivatives.
   
   #if k is an integer with the class number: 
   loss_deriv <- tail(nn$h,1)[[1]]
@@ -186,12 +224,23 @@ backward <- function(nn,k){
   return(c(nn, derivatives))
 }
 
-
 ####----------------------------Step 4--------------------------------------####
 #compute the derivatives of the loss corresponding to output class k for nn.
 
 #function to train the network
 train <- function(nn,inp,k,eta=.01,mb=10,nstep=10000){
+  ## Train the neural network using stochastic gradient descent.
+  ##
+  ## Parameters:
+  ## nn: Neural network structure obtained from the netup function.
+  ## inp: Matrix whose rows are the datapoints.
+  ## k: Corresponding vector of classes.
+  ## eta: Learning rate.
+  ## mb: Mini-batch size.
+  ## nstep: Number of training steps.
+  ##
+  ## Returns:
+  ## The trained neural network structure.
   
   #inp is a matrix whose rows are the datapoints
   #k is the corresponding vector of classes 1,2,3,..
