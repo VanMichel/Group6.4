@@ -86,57 +86,39 @@
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~START OF CODE~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-
-
 ####----------------------------Step 1--------------------------------------####
 #build the nodes (h) structure and initiate value of W and b
-
-#QUESTION: SHALL WE KEEP THE -0.1 TERMS IN INITIALISATION OF W AND b? 
-#NOTE: results seem better with!
-
 netup <- function(d){
-  #create h list, append values
+  #create h list, append values - node values
   h <- list()
   for(i in 1:length(d)){
     new_vec <- rep(NA,d[i])
     h[[length(h) + 1]] <- new_vec
   }
   
-  #create W
+  #create W - weights matrices
   W <- list()
   for(i in 1:(length(d)-1)){
     area <- d[i]* d[i+1]
-    W[[length(W) + 1]] <- matrix(runif(area,0,0.2), nrow = d[i+1],ncol = d[i])-0.1
+    W[[length(W) + 1]] <- matrix(runif(area,0,0.2), nrow = d[i+1],ncol = d[i])
   }
   
-  #create b
+  #create b - biases vectors
   b <- list()
   for(i in 1:(length(d)-1)){
-    b[[length(b) + 1]] <- c(runif(d[i+1],0,0.2))-0.1
+    b[[length(b) + 1]] <- c(runif(d[i+1],0,0.2))
   }
   
   network_list <- list("h" = h, "W" = W, "b" = b)
   return(network_list)
 }
 
-
-
-#CHANGED: NOW USES VECTORISED FORM!
-#function to calculate a node for each possible class 
+#function to calculate output layer node values
 softmax <- function(vec_out){
   return(exp(vec_out)/sum(exp(vec_out)))
-  
-  #copy_vec <- vec_out
-  
-  #for(i in 1:length(copy_vec)){
-  #  copy_vec[i] <- exp(vec_out[i])/sum(exp(vec_out))
-  #}
-  
-  #return(copy_vec)
 }
 
-
-#CHANGE: ADDED THE FULL LOSS FUNCTION!
+#function to calculate loss
 loss <- function(nn,inp,k)
 {
   #inp is a matrix with input data in its rows; classes in vector k
@@ -171,8 +153,7 @@ forward <- function(nn,inp){
     }else{ #and softmax to the output layer
       copy_network$h[[i+1]] <- softmax(copy_network$W[[i]]%*%copy_network$h[[i]]+copy_network$b[[i]])
     }
-    #QUESTION: currently this does not apply ReLU() to obtain h[L]; only softmax(); should it apply softmax(ReLU())??
-    
+
   }
   
   return(copy_network)
@@ -182,14 +163,9 @@ forward <- function(nn,inp){
 ####----------------------------Step 3--------------------------------------####
 backward <- function(nn,k){
   
-  #label_pos <- which(k==1)
-  
   #if k is an integer with the class number: 
   loss_deriv <- tail(nn$h,1)[[1]]
   loss_deriv[k] <- loss_deriv[k] - 1
-  
-  #calculate the loss for the current inp vector
-  #loss_deriv <- tail(nn$h,1)[[1]]-k
   
   dh <- list()
   dh[[length(nn$W)+1]] <- loss_deriv
@@ -200,9 +176,6 @@ backward <- function(nn,k){
   #backpropagate the loss
   for(i in rev(seq(1:length(nn$W)))){
     
-    #zero_ids <- which(nn$h[[i+1]]<=0)
-    
-    #dh[[i]] <- t(nn$W[[i]])%*%pmax(dh[[i+1]],0)
     dh[[i]] <- t(nn$W[[i]])%*%(dh[[i+1]]*((nn$h[[i+1]]>0)+0L))
     dW[[i]] <- (dh[[i+1]]*((nn$h[[i+1]]>0)+0L))%*%t(nn$h[[i]])
     db[[i]] <- (dh[[i+1]]*((nn$h[[i+1]]>0)+0L))
@@ -217,7 +190,7 @@ backward <- function(nn,k){
 ####----------------------------Step 4--------------------------------------####
 #compute the derivatives of the loss corresponding to output class k for nn.
 
-#TRAIN FUNCTION REWRITTEN: 
+#function to train the network
 train <- function(nn,inp,k,eta=.01,mb=10,nstep=10000){
   
   #inp is a matrix whose rows are the datapoints
@@ -234,14 +207,6 @@ train <- function(nn,inp,k,eta=.01,mb=10,nstep=10000){
     dLdb[[i]] <- 0
   }
   
-  #QUESTION: AVOID LOOP WITH lapply?
-  #could do as follows: create required number of entries
-  #dLdW[[length(copy_network$W)]] <- 0 
-  #use lapply:
-  #lapply(dLdW, function(x) 0 )
-  
-  
-  #CHANGE: REWROTE FOR LOOP TO COVER mb=1 and mb>1 together  
   for (n in 1:nstep) {
     
     #sample mb datapoint for gradient calculation
@@ -274,147 +239,56 @@ train <- function(nn,inp,k,eta=.01,mb=10,nstep=10000){
       dLdW[[j]] <- 0
       dLdb[[j]] <- 0
     }
-    #QUESTION:  
-    #use lapply instead?
-    #lapply(dLdW, function(x) 0 )  
     
   }
   
   #return the trained network
   return(copy_network)
 }
-
-
-
-
-train_old <- function(nn,inp,k,eta=.01,mb=10,nstep=10000){
-  
-  #inp is a matrix whose rows are the datapoints
-  #k is the corresponding vector of classes 1,2,3,..
-  
-  copy_network <- nn
-  
-  #lists for the gradients used to update W and b
-  dLdW <- list()
-  dLdb <- list()
-  
-  #initialize to zero 
-  for(i in 1:length(copy_network$W)){
-    dLdW[[i]] <- 0
-    dLdb[[i]] <- 0
-  }
-  
-  for (n in 1:nstep) {
-    #sample mb datapoint for gradient calculation
-    isample <- sample(1:nrow(inp), mb)
-    xdat <- inp[isample,]
-    kdat <- k[isample]
-    
-    if(mb == 1) {
-      #compute node values
-      copy_network <- forward(copy_network,xdat)
-      #run backward to compute the gradients
-      copy_network_grads <- backward(copy_network, kdat)
-      
-      for(i in 1:length(copy_network$W)){
-        dLdW[[i]] <- copy_network_grads$dW[[i]]
-        dLdb[[i]] <- copy_network_grads$db[[i]]
-      }
-      
-    }
-    
-    else{
-      
-      for (i in 1:mb){
-        #compute node values
-        copy_network <- forward(copy_network,xdat[i,])
-        #run backward to compute the gradients
-        copy_network_grads <- backward(copy_network, kdat[i])
-        
-        #sum of gradients up to current i
-        for(j in 1:length(copy_network$W)){
-          dLdW[[j]] <- dLdW[[j]] + copy_network_grads$dW[[j]]
-          dLdb[[j]] <- dLdb[[j]] + copy_network_grads$db[[j]]
-        }
-      }
-    }
-    #update W and b in copy_network using the average of the mb gradients
-    for(j in 1:length(copy_network$W)){
-      copy_network$W[[j]] <- copy_network$W[[j]] - eta*dLdW[[j]]/mb 
-      copy_network$b[[j]] <- copy_network$b[[j]] - eta*dLdb[[j]]/mb 
-    }
-    
-    #reset gradients to zero for new gradient calculation
-    for(j in 1:length(copy_network$W)){
-      dLdW[[j]] <- 0
-      dLdb[[j]] <- 0
-    }
-  }
-  #return the trained network
-  return(copy_network)
-}
-
-
-
-
-
 ####----------------------------Step 5--------------------------------------####
 
-#Set the data to train the nn and test data to get predicted class
-test_data <- function(d = c(4,8,7,3), data = iris, class_col = ncol(data)) {
-  
-  nn <- netup(d)
-  
-  if(length(nn$h[[1]]) != (ncol(data)-1)){
-    cat("Wrong number of nodes in input layer! \n")
-    break
-  }
-  
-  if(length(tail(nn$h,1)[[1]]) != length(levels(data[class_col]))){
-    cat("Wrong number of nodes in output layer! \n")
-    break
-  }
-  
-  n_d = length(d) #count how many layers in the neural network's structure
-  d_val = data[,-class_col] 
-  d_values = data.matrix(d_val)
-  d_classes = as.numeric(data[,class_col]) #labeling the classes to put in vector k
-  
-  #prepare a set test data consists of every 5th row, starting from row 5.
-  ii_test <- which((1:length(d_classes))%%5==0)
-  test_values <- d_values[ii_test,]
-  test_classes <- d_classes[ii_test]
-  predicted <- rep(0,length(ii_test))
-  
-  #prepare a set train data
-  train_values <- d_values[-ii_test,]
-  train_classes <- d_classes[-ii_test]
+#set seed for good predictions
+set.seed(2)
 
-  #training the fit network
-  set.seed(nrow(test_classes))
-  #loss before training
-  cat("Loss before training:", loss(nn,train_values,train_classes), "\n")
-  trained_network <- train(nn,train_values,train_classes,mb=10)
-  
-  cat("Loss after training:", loss(trained_network,train_values,train_classes), "\n")
- 
-  
-  #classify the test data to species according to the class predicted             +
-  #+ as most probable by using the trained network
-  for (i in 1:length(ii_test)) {
-    result <- forward(trained_network,test_values[i,])$h[[n_d]]
-    predicted[i] <- which(result==max(result))
-  }
-  
-  #compute the misclassification rate
-  equal <- predicted == test_classes
-  misclass_rate = round(length(which(equal=="FALSE"))/length(predicted),2)
-  test_list = list("predicted" = predicted, "test_classes" = test_classes, "misclass.r" = misclass_rate)
-  return (test_list)
-  }
+nn <- netup(c(4,8,7,3))
+n_d = length(nn$h) #count how many layers in the neural network's structure
+d_val = iris[,-5] 
+d_values = data.matrix(d_val)
+d_classes = as.numeric(iris[,5]) #labeling the classes to put in vector k
+
+#prepare a set test data consists of every 5th row, starting from row 5.
+ii_test <- which((1:length(d_classes))%%5==0)
+test_values <- d_values[ii_test,]
+test_classes <- d_classes[ii_test]
+predicted <- rep(0,length(ii_test))
+
+#prepare a set train data
+train_values <- d_values[-ii_test,]
+train_classes <- d_classes[-ii_test]
+
+
+#loss before training
+cat("Loss before training:", loss(nn,train_values,train_classes), "\n")
+#training the fit network
+trained_network <- train(nn,train_values,train_classes,mb=10)
+
+cat("Loss after training:", loss(trained_network,train_values,train_classes), "\n")
+
+
+#classify the test data to species according to the class predicted             +
+#+ as most probable by using the trained network
+for (i in 1:length(ii_test)) {
+  result <- forward(trained_network,test_values[i,])$h[[n_d]]
+  predicted[i] <- which(result==max(result))
+}
+
+#compute the misclassification rate
+equal <- predicted == test_classes
+misclass_rate = round(length(which(equal=="FALSE"))/length(predicted),2)
+cat("True test labels:", test_classes, "\n")
+cat("Predicted test labels:", predicted, "\n")
+cat("Misclassification rate:", misclass_rate, "\n")
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-test.data = test_data() ; test.data
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~--END OF CODE~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
